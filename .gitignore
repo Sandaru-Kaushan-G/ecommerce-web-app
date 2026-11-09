@@ -1,0 +1,15 @@
+# Dependencies (backend & frontend)
+node_modules/
+
+# Environment variables (backend & frontend secrets)
+.env
+.env.local
+.env.*.local
+
+# Production build outputs (frontend)
+dist/
+build/
+
+# Logs & OS files
+npm-debug.log*
+.DS_Store

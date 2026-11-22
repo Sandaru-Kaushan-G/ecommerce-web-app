@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import './CatalogPage.css';
 
 export default function CatalogPage() {
   const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState([]);
   const [couponCode, setCouponCode] = useState('');
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { cart, addToCart, updateCartQty, clearCart, itemCount, subtotal } = useCart();
 
   useEffect(() => {
     fetchProducts();
@@ -17,36 +18,13 @@ export default function CatalogPage() {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/products');
+      const res = await api.get('/products');
       setProducts(res.data);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
-
-  const addToCart = (product) => {
-    const existing = cart.find(item => item._id === product._id);
-    if (existing) {
-      if (existing.quantity >= product.stock) {
-        setFeedback({ type: 'error', text: `Only ${product.stock} units available in inventory.` });
-        return;
-      }
-      setCart(cart.map(item => item._id === product._id ? { ...item, quantity: item.quantity + 1 } : item));
-    } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
-    }
-  };
-
-  const updateCartQty = (productId, delta) => {
-    setCart(prev => prev.map(item => {
-      if (item._id === productId) {
-        const nextQty = item.quantity + delta;
-        return nextQty > 0 ? { ...item, quantity: nextQty } : null;
-      }
-      return item;
-    }).filter(Boolean));
   };
 
   const handleCheckout = async () => {
@@ -62,23 +40,19 @@ export default function CatalogPage() {
         couponCode: couponCode.trim() || undefined
       };
 
-      const res = await axios.post('http://localhost:5000/api/orders/checkout', payload, {
-        headers: { Authorization: `Bearer ${user.token}` }
-      });
+      const res = await api.post('/orders/checkout', payload);
 
       setFeedback({
         type: 'success',
         text: `Order confirmed! Reference: #${res.data.order._id.slice(-6)} · Settled: Rs. ${res.data.order.total.toLocaleString()}`
       });
-      setCart([]);
+      clearCart();
       setCouponCode('');
       fetchProducts();
     } catch (err) {
-      setFeedback({ type: 'error', text: err.response?.data?.message || 'Checkout could not be processed.' });
+      setFeedback({ type: 'error', text: err.response?.data?.detail || err.response?.data?.message || 'Checkout could not be processed.' });
     }
   };
-
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <main className="catalog-container">
@@ -103,7 +77,7 @@ export default function CatalogPage() {
         {/* Products Section */}
         <div>
           {loading ? (
-            <p style={{ color: '#94a3b8' }}>Fetching catalog entries...</p>
+            <p className="catalog-loading" role="status">Fetching catalog entries...</p>
           ) : (
             <div className="products-grid">
               {products.map(p => (
@@ -125,7 +99,15 @@ export default function CatalogPage() {
                       </div>
 
                       <button
-                        onClick={() => addToCart(p)}
+                        onClick={() => {
+                          const existing = cart.find((item) => item._id === p._id);
+                          if (existing?.quantity >= p.stock) {
+                            setFeedback({ type: 'error', text: `Only ${p.stock} units available in inventory.` });
+                            return;
+                          }
+                          addToCart(p);
+                          setFeedback({ type: 'success', text: `${p.title} added to your bag.` });
+                        }}
                         disabled={p.stock === 0}
                         className={`btn-add-cart ${p.stock > 0 ? 'available' : 'depleted'}`}
                       >
@@ -143,7 +125,7 @@ export default function CatalogPage() {
         <aside className="cart-sidebar">
           <div className="cart-header">
             <h2 className="cart-title">Order Summary</h2>
-            <span className="cart-badge">{cart.reduce((s, i) => s + i.quantity, 0)} items</span>
+            <span className="cart-badge">{itemCount} items</span>
           </div>
 
           {cart.length === 0 ? (
@@ -162,9 +144,9 @@ export default function CatalogPage() {
                     </div>
 
                     <div className="qty-control-group">
-                      <button className="btn-qty" onClick={() => updateCartQty(item._id, -1)}>-</button>
+                      <button className="btn-qty" aria-label={`Decrease ${item.title} quantity`} onClick={() => updateCartQty(item._id, -1)}>-</button>
                       <span className="qty-count">{item.quantity}</span>
-                      <button className="btn-qty" onClick={() => updateCartQty(item._id, 1)}>+</button>
+                      <button className="btn-qty" aria-label={`Increase ${item.title} quantity`} onClick={() => updateCartQty(item._id, 1)}>+</button>
                     </div>
                   </div>
                 ))}

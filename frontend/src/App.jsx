@@ -1,18 +1,14 @@
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CartProvider } from './context/CartContext';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 
 import AuthPage from './pages/AuthPage';
 import CatalogPage from './pages/customer/CatalogPage';
 import StaffOrdersPage from './pages/staff/StaffOrdersPage';
-import './App.css'; // <-- External Stylesheet එක සම්බන්ධ කිරීම
-
-const AdminDashboard = () => (
-  <div className="admin-dashboard-wrapper">
-    <h1 className="admin-dashboard-title">Admin Dashboard</h1>
-    <p className="admin-dashboard-subtitle">Store metrics & administrative privileges.</p>
-  </div>
-);
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AcceptInvitePage from './pages/AcceptInvitePage';
+import './App.css'; 
 
 const Unauthorized = () => (
   <div className="unauthorized-wrapper">
@@ -88,11 +84,13 @@ const Navbar = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Navbar />
-        <Routes>
+      <CartProvider>
+        <BrowserRouter>
+          <Navbar />
+          <Routes>
           <Route path="/" element={<CatalogPage />} />
           <Route path="/login" element={<AuthPage />} />
+          <Route path="/accept-invite" element={<AcceptInvitePage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           <Route element={<ProtectedRoute allowedRoles={['staff', 'admin']} />}>
@@ -102,8 +100,9 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin" element={<AdminDashboard />} />
           </Route>
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </CartProvider>
     </AuthProvider>
   );
 }

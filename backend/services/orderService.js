@@ -1,17 +1,22 @@
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { applyDiscount } = require('./discountService');
+const { ValidationError, NotFoundError, ConflictError } = require('../utils/errors');
 
-const executeCheckout = async (userId, items, couponCode) => {
+const executeCheckout = async (userId, items, couponCode, session, shippingDetails) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new ValidationError('At least one item is required to place an order');
+  }
+
   let subtotal = 0;
   const verifiedItems = [];
 
   for (const item of items) {
-    const product = await Product.findById(item.productId);
-    if (!product) throw new Error(`Product not found: ${item.productId}`);
-    if (product.stock < item.quantity) {
-      throw new Error(`Not enough stock for: ${product.title}`);
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+      throw new ValidationError('Item quantities must be positive whole numbers');
     }
+    const product = await Product.findById(item.productId).session(session);
+    if (!product) throw new NotFoundError(`Product not found: ${item.productId}`);
 
     subtotal += product.price * item.quantity;
     verifiedItems.push({
@@ -21,23 +26,26 @@ const executeCheckout = async (userId, items, couponCode) => {
     });
   }
 
-  const discount = await applyDiscount(couponCode, subtotal);
+  const discount = await applyDiscount(couponCode, subtotal, session);
   const finalTotal = Math.max(0, subtotal - discount);
 
-  // Stock අඩු කිරීම
   for (const item of verifiedItems) {
-    await Product.findByIdAndUpdate(item.product, {
-      $inc: { stock: -item.quantity }
-    });
+    const updatedProduct = await Product.findOneAndUpdate(
+      { _id: item.product, stock: { $gte: item.quantity } },
+      { $inc: { stock: -item.quantity } },
+      { new: true, session }
+    );
+    if (!updatedProduct) throw new ConflictError(`Not enough stock for product ${item.product}`);
   }
 
-  const order = await Order.create({
+  const [order] = await Order.create([{
     user: userId,
+    shippingDetails,
     items: verifiedItems,
     subtotal,
     discountAmount: discount,
     total: finalTotal
-  });
+  }], { session });
 
   return order;
 };

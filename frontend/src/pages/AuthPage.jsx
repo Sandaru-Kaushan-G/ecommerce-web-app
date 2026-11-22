@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import './AuthPage.css';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'customer' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   
   const { login } = useAuth();
@@ -21,94 +22,79 @@ export default function AuthPage() {
 
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const res = await axios.post(`http://localhost:5000${endpoint}`, formData);
+      const res = await api.post(endpoint.replace('/api', ''), formData);
 
       if (isLogin) {
-        // Login සාර්ථක වූ පසු State එක update කර අදාළ Role එකට යවයි
+      
         login(res.data);
         if (res.data.role === 'admin') navigate('/admin');
         else if (res.data.role === 'staff') navigate('/staff');
         else navigate('/');
       } else {
-        alert('Registration successful! Please login.');
+        setError('Registration successful. Please sign in.');
         setIsLogin(true);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Something went wrong');
+      setError(err.response?.data?.detail || err.response?.data?.message || 'Something went wrong');
     }
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ddd', borderRadius: '8px', background: '#fff', color: '#333' }}>
-      <h2>{isLogin ? 'Login' : 'Create Account'}</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+    <main className="auth-page">
+      <section className="auth-panel" aria-labelledby="auth-title">
+      <h2 id="auth-title">{isLogin ? 'Welcome back' : 'Create your account'}</h2>
+      {error && <p className="auth-message" role="alert">{error}</p>}
       
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <form onSubmit={handleSubmit} className="auth-form">
         {!isLogin && (
-          <div>
-            <label>Name:</label>
+          <div className="form-field">
+            <label htmlFor="name">Name</label>
             <input 
               type="text" 
               name="name" 
               required 
               onChange={handleChange} 
-              style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} 
+              id="name"
             />
           </div>
         )}
 
-        <div>
-          <label>Email:</label>
+        <div className="form-field">
+          <label htmlFor="email">Email</label>
           <input 
             type="email" 
             name="email" 
             required 
             onChange={handleChange} 
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} 
+            id="email"
           />
         </div>
 
-        <div>
-          <label>Password:</label>
+        <div className="form-field">
+          <label htmlFor="password">Password</label>
           <input 
             type="password" 
             name="password" 
             required 
             onChange={handleChange} 
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} 
+            id="password"
           />
         </div>
 
-        {!isLogin && (
-          <div>
-            <label>Select Role (For Testing):</label>
-            <select 
-              name="role" 
-              value={formData.role} 
-              onChange={handleChange} 
-              style={{ width: '100%', padding: '8px' }}
-            >
-              <option value="customer">Customer</option>
-              <option value="staff">Staff</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-        )}
-
-        <button type="submit" style={{ padding: '10px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+        <button type="submit" className="auth-submit">
           {isLogin ? 'Login' : 'Register'}
         </button>
       </form>
 
-      <p style={{ marginTop: '15px', textAlign: 'center' }}>
+      <p className="auth-switch">
         {isLogin ? "Don't have an account? " : "Already have an account? "}
-        <span 
+        <button type="button" className="auth-switch-button"
           onClick={() => { setIsLogin(!isLogin); setError(''); }} 
-          style={{ color: '#007bff', cursor: 'pointer', fontWeight: 'bold' }}
         >
           {isLogin ? 'Register here' : 'Login here'}
-        </span>
+        </button>
       </p>
-    </div>
+      </section>
+    </main>
   );
 }
